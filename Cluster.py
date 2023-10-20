@@ -10,7 +10,6 @@ if __name__ == "__main__":
 
     # Configuration
     inter_cluster_topic = "inter-cluster-topic"
-    internal_cluster_topic = "internal-cluster-topic"
     cluster = MQTTCluster("test.mosquitto.org", int(args.num_workers), args.cluster_name, inter_cluster_topic, args.internal_cluster_topic)
 
     # Create clients for both clusters
