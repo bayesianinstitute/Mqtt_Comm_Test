@@ -46,7 +46,7 @@ class MQTTCluster:
 inter_cluster_topic = "inter-cluster-topic"
 cluster1 = MQTTCluster("test.mosquitto.org", 3, "Cluster2")
 
-# Create clients for Cluster 1
+# Create clients for Cluster 2
 cluster1.create_clients()
 
 try:
@@ -58,17 +58,17 @@ try:
             print("New Head Node:", cluster1.get_head_node())
             time.sleep(2)
 
-        # Send messages from Cluster 1
-        message_from_cluster1 = f"Hello from Cluster 1, Worker Head Node {cluster1.get_head_node()}"
+        # Send messages from Cluster 2
+        message_from_cluster1 = f"Hello from Cluster 2, Worker Head Node {cluster1.get_head_node()}"
         cluster1.send_inter_cluster_message(message_from_cluster1)
 
         time.sleep(5)
         cluster1.round += 1
 
-        print("Round completed in Cluster 1:", cluster1.round)
+        print("Round completed in Cluster 2:", cluster1.round)
 
         if cluster1.round == 10:
-            print("All Rounds completed in Cluster 1.")
+            print("All Rounds completed in Cluster 2.")
             break
 
         time.sleep(5)  # Sleep for 5 seconds between rounds
