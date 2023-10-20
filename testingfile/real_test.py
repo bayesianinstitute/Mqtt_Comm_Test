@@ -1,6 +1,7 @@
 import paho.mqtt.client as mqtt
 import random
 import time
+import argparse
 
 class MQTTCluster:
     def __init__(self, broker_address, num_clients, cluster_name):
@@ -25,7 +26,6 @@ class MQTTCluster:
         client_id = client._client_id.decode('utf-8')
         cluster_id = self.cluster_name
 
-        print(f"Received message on topic: {message.topic}")
 
         if message.topic == internal_cluster_topic:
             # To Receive to head Only
@@ -53,60 +53,47 @@ class MQTTCluster:
         for client in self.clients:
             if client != self.worker_head_node:
                 client.publish(internal_cluster_topic, f"Internal message in {self.cluster_name} from {client._client_id.decode('utf-8')}")
+    
+    def run(self):
+        try:
+            while self.round < 10:  # Run for a specified number of rounds
+                # Switch worker head node when the round is even
+                if self.round % 2 == 0:
+                    print(f"Changing worker head in {self.cluster_name} !!!!!!!!!!!!!!!")
+                    self.switch_worker_head_node()
+                    print("New Head Node:", self.get_head_node())
+                    time.sleep(2)
 
-# Configuration
-inter_cluster_topic = "inter-cluster-topic"
-internal_cluster_topic = "internal-cluster-topic"
-cluster1 = MQTTCluster("test.mosquitto.org", 3, "Cluster1")
-cluster2 = MQTTCluster("test.mosquitto.org", 3, "Cluster2")
+                # Send messages
+                message = f"Hello from {self.cluster_name}, Worker Head Node {self.get_head_node()}"
+                self.send_inter_cluster_message(message)
 
+                # Send internal messages
+                self.send_internal_messages()
+                time.sleep(5)
+                self.round += 1
+                print("Round completed:", self.round)
 
+                if self.round == 10:
+                    print("All Rounds completed!")
 
-# Create clients for both clusters
-cluster1.create_clients()
-cluster2.create_clients()
+                time.sleep(5)  # Sleep for 5 seconds between rounds
 
-try:
-    while True:
-        # Switch worker head node when the round is even
-        if cluster1.round % 2 == 0:
-            print(f"Changing worker head in cluster1 !!!!!!!!!!!!!!!")
-            cluster1.switch_worker_head_node()
-            print("New Head Node :",cluster1.get_head_node())
-            time.sleep(2)
+        except KeyboardInterrupt:
+            for client in self.clients:
+                client.loop_stop()
+                client.disconnect()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("cluster_name", help="Name of the cluster")
+    args = parser.parse_args()
+    # Configuration
+    inter_cluster_topic = "inter-cluster-topic"
+    internal_cluster_topic = "internal-cluster-topic"
+    cluster1 = MQTTCluster("test.mosquitto.org", 3, args.cluster_name)
 
-        if cluster2.round % 2 == 0:
-            print(f"Changing worker head in cluster2 !!!!!!!!!!!!!!!")
-            cluster2.switch_worker_head_node()
-            print("New Head Node :",cluster2.get_head_node())
-            time.sleep(2)
+    # Create clients for both clusters
+    cluster1.create_clients()
 
-
-        # Send messages
-        message_from_cluster1 = f"Hello from Cluster 1, Worker Head Node {cluster1.get_head_node()}"
-        cluster1.send_inter_cluster_message(message_from_cluster1)
-
-        message_from_cluster2 = f"Hello from Cluster 2, Worker Head Node {cluster2.get_head_node()}"
-        cluster2.send_inter_cluster_message(message_from_cluster2)
-
-        # Send internal messages
-        cluster1.send_internal_messages()
-        cluster2.send_internal_messages()
-        time.sleep(5)
-        cluster1.round += 1
-        cluster2.round += 1
-
-        print("Round completed : ", cluster1.round)
-
-        if round ==10:
-            print("All Round completed : " )
-
-
-
-        time.sleep(5)  # Sleep for 5 seconds between rounds
-
-except KeyboardInterrupt:
-    for cluster in [cluster1, cluster2]:
-        for client in cluster.clients:
-            client.loop_stop()
-            client.disconnect()
+    # Run the logic for cluster1
+    cluster1.run()

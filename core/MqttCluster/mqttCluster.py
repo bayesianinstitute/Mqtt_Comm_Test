@@ -10,8 +10,6 @@ class MQTTCluster:
         self.cluster_name = cluster_name
         self.worker_head_node = None
         self.round = 0
-
-        # Topic
         self.inter_cluster_topic=inter_cluster_topic
         self.internal_cluster_topic=internal_cluster_topic
 
@@ -29,16 +27,14 @@ class MQTTCluster:
         client_id = client._client_id.decode('utf-8')
         cluster_id = self.cluster_name
 
+
         if message.topic == self.internal_cluster_topic:
             # To Receive to head Only
-            if client == self.worker_head_node:
                 print(f"Received Internal message in {cluster_id} from {client_id}: {message.payload.decode('utf-8')}")
         elif message.topic == self.inter_cluster_topic:
             if self.is_worker_head(client):
                 print(f"Inter-cluster message in {cluster_id} from {client_id}: {message.payload.decode('utf-8')}")
-                time.sleep(2)
 
-    # Getter for Head Node in CLuster
     def get_head_node(self):
         return self.worker_head_node._client_id.decode('utf-8').split('_')[-1]
 
@@ -49,6 +45,7 @@ class MQTTCluster:
     def switch_worker_head_node(self):
         self.worker_head_node = random.choice(self.clients)
 
+
     def send_inter_cluster_message(self, message):
         self.worker_head_node.publish(self.inter_cluster_topic, message)
 
@@ -56,3 +53,33 @@ class MQTTCluster:
         for client in self.clients:
             if client != self.worker_head_node:
                 client.publish(self.internal_cluster_topic, f"Internal message in {self.cluster_name} from {client._client_id.decode('utf-8')}")
+    
+    def run(self):
+        try:
+            while self.round < 10:  # Run for a specified number of rounds
+                # Switch worker head node when the round is even
+                if self.round % 2 == 0:
+                    print(f"Changing worker head in {self.cluster_name} !!!!!!!!!!!!!!!")
+                    self.switch_worker_head_node()
+                    print("New Head Node:", self.get_head_node())
+                    time.sleep(2)
+
+                # Send messages
+                message = f"Hello from {self.cluster_name}, Worker Head Node {self.get_head_node()}"
+                self.send_inter_cluster_message(message)
+
+                # Send internal messages
+                self.send_internal_messages()
+                time.sleep(5)
+                self.round += 1
+                print("Round completed:", self.round)
+
+                if self.round == 10:
+                    print("All Rounds completed!")
+
+                time.sleep(5)  # Sleep for 5 seconds between rounds
+
+        except KeyboardInterrupt:
+            for client in self.clients:
+                client.loop_stop()
+                client.disconnect()

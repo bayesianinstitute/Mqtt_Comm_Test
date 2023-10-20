@@ -1,79 +1,56 @@
 import paho.mqtt.client as mqtt
-import random
 import time
+import argparse
 
 class MQTTCluster:
-    def __init__(self, broker_address, num_clients, cluster_name):
+    def __init__(self, broker_address, cluster_name, client_name):
         self.broker_address = broker_address
-        self.num_clients = num_clients
-        self.clients = []
         self.cluster_name = cluster_name
-        self.worker_head_node = None
-        self.round = 0
+        self.client_name = client_name
+        self.client = None
 
-    def create_clients(self):
-        for i in range(self.num_clients):
-            client = mqtt.Client(f"{self.cluster_name}_Client_{i}")
-            client.connect(self.broker_address, 1883)
-            client.subscribe(inter_cluster_topic, qos=0)
-            client.on_message = self.on_message
-            client.loop_start()
-            self.clients.append(client)
+    def create_client(self):
+        self.client = mqtt.Client(self.client_name)
+        self.client.connect(self.broker_address, 1883)
+        self.client.on_message = self.on_message
+        self.client.loop_start()
 
     def on_message(self, client, userdata, message):
         client_id = client._client_id.decode('utf-8')
         cluster_id = self.cluster_name
 
-        print(f"Received message on topic: {message.topic}")
-
         if message.topic == inter_cluster_topic:
-            if self.is_worker_head(client):
-                print(f"Inter-cluster message in {cluster_id} from {client_id}: {message.payload.decode('utf-8')}")
+            print(f"Inter-cluster message in {cluster_id} from {client_id}: {message.payload.decode('utf-8')}")
 
-    def get_head_node(self):
-        return self.worker_head_node._client_id.decode('utf-8').split('_')[-1]
+    def subscribe(self, topic, qos=0):
+        self.client.subscribe(topic, qos)
 
-    def is_worker_head(self, client):
-        return client == self.worker_head_node
+    def send_inter_cluster_message(self, topic, message):
+        self.client.publish(topic, message)
 
-    def switch_worker_head_node(self):
-        self.worker_head_node = random.choice(self.clients)
+    def run(self):
+        while True:
+            message = f"Hello from {self.client_name} in {self.cluster_name}"
+            self.send_inter_cluster_message(inter_cluster_topic, message)
+            time.sleep(5)
 
-    def send_inter_cluster_message(self, message):
-        self.worker_head_node.publish(inter_cluster_topic, message)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("cluster_name", help="Name of the cluster")
+    parser.add_argument("client_name", help="Client name for MQTT communication")
+    args = parser.parse_args()
 
-# Configuration
-inter_cluster_topic = "inter-cluster-topic"
-cluster1 = MQTTCluster("test.mosquitto.org", 3, "Cluster2")
+    # Configuration
+    inter_cluster_topic = "inter-cluster-topic"
+    cluster = MQTTCluster("test.mosquitto.org", args.cluster_name, args.client_name)
 
-# Create clients for Cluster 2
-cluster1.create_clients()
+    # Create a client for the specified cluster
+    cluster.create_client()
 
-try:
-    while True:
-        # Switch worker head node when the round is even
-        if cluster1.round % 2 == 0:
-            print(f"Changing worker head in Cluster 2 !!!!!!!!!!!!!!!")
-            cluster1.switch_worker_head_node()
-            print("New Head Node:", cluster1.get_head_node())
-            time.sleep(2)
+    # Subscribe to the inter-cluster topic
+    cluster.subscribe(inter_cluster_topic, qos=0)
 
-        # Send messages from Cluster 2
-        message_from_cluster1 = f"Hello from Cluster 2, Worker Head Node {cluster1.get_head_node()}"
-        cluster1.send_inter_cluster_message(message_from_cluster1)
-
-        time.sleep(5)
-        cluster1.round += 1
-
-        print("Round completed in Cluster 2:", cluster1.round)
-
-        if cluster1.round == 10:
-            print("All Rounds completed in Cluster 2.")
-            break
-
-        time.sleep(5)  # Sleep for 5 seconds between rounds
-
-except KeyboardInterrupt:
-    for client in cluster1.clients:
-        client.loop_stop()
-        client.disconnect()
+    try:
+        cluster.run()
+    except KeyboardInterrupt:
+        print("Execution interrupted.")
