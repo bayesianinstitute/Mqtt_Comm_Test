@@ -54,9 +54,30 @@ class MQTTCluster:
             if client != self.worker_head_node:
                 client.publish(self.internal_cluster_topic, f"Internal message in {self.cluster_name} from {client._client_id.decode('utf-8')}")
     
+    def switch_broker(self, new_broker_address):
+        # Disconnect existing clients
+        for client in self.clients:
+            client.loop_stop()
+            client.disconnect()
+
+        # Update the broker address
+        self.broker_address = new_broker_address
+
+        # Re-create clients with the new broker address
+        self.create_clients()
+    
     def run(self):
         try:
             while self.round < 10:  # Run for a specified number of rounds
+
+                # Switch broker after round 6
+                if self.round == 6:
+                    new_broker_address = "broker.hivemq.com"  # Replace with your new broker address
+                    print(f"Switching broker to {new_broker_address} after round 6")
+                    self.switch_broker(new_broker_address)
+
+
+
                 # Switch worker head node when the round is even
                 if self.round % 2 == 0:
                     print(f"Changing worker head in {self.cluster_name} !!!!!!!!!!!!!!!")
