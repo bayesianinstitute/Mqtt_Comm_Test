@@ -38,7 +38,7 @@ python Cluster.py USA 3 internal-cluster-topic-USA
 ```
 
 ### Core Functions
-In the project's core, it contains the main MqttCluster class that handles the MQTT cluster communication. The core functionalities include:
+The project's core contains the main MqttCluster class that handles the MQTT cluster communication. The core functionalities include:
 
 Creating and managing MQTT clients.
 Running the logic for the cluster.
