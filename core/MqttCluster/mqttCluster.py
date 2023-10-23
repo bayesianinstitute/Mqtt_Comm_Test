@@ -27,7 +27,7 @@ class MQTTCluster:
 
     def aggratedglobalMsg(self):
         if len(self.glb_msg)>=len(self.clients)-1:
-            aggregator = "\n Aggrated Message ".join(str(item) for item in self.glb_msg)  # Convert elements to strings before joining
+            aggregator = f"\n Aggrated Message ".join(str(item) for item in self.glb_msg)  # Convert elements to strings before joining
             self.send_inter_cluster_message(aggregator)
             # Clear
             self.glb_msg.clear()
@@ -54,34 +54,36 @@ class MQTTCluster:
                     time.sleep(5)
                     receive=0                
         elif message.topic == self.inter_cluster_topic:
+            data=message.payload.decode('utf-8')
             if self.is_worker_head(client):
-                print(f"Inter-cluster message in {cluster_id} from {client_id} \n : {message.payload.decode('utf-8')}")
+                print(f"Inter-cluster message in {cluster_id} from {client_id} \n : {data}")
                 time.sleep(5)
 
+    # Send Inter-cluster
+    def send_inter_cluster_message(self, message):
+        self.worker_head_node.publish(self.inter_cluster_topic, message)
+
+    # Send 
+    def send_internal_messages(self):
+        for client in self.clients:
+            if client != self.worker_head_node:
+                client.publish(self.internal_cluster_topic, f" Here is  in {self.cluster_name} from {client._client_id.decode('utf-8')} is training")
     
+    # get worker head
+    def is_worker_head(self, client):
+        return client == self.worker_head_node
+
     def get_head_node(self):
         return self.worker_head_node._client_id.decode('utf-8').split('_')[-1]
 
 
-    def is_worker_head(self, client):
-        return client == self.worker_head_node
+
 
     def switch_worker_head_node(self):
         self.worker_head_node = random.choice(self.clients)
 
 
 
-    def send_inter_cluster_message(self, message):
-        self.worker_head_node.publish(self.inter_cluster_topic, message)
-
-    # def trainmsg(self):
-    #     return 
-
-    def send_internal_messages(self):
-        for client in self.clients:
-            if client != self.worker_head_node:
-                client.publish(self.internal_cluster_topic, f" Here is  in {self.cluster_name} from {client._client_id.decode('utf-8')} is training")
-    
     def switch_broker(self, new_broker_address):
         # Disconnect existing clients
         for client in self.clients:
@@ -113,11 +115,7 @@ class MQTTCluster:
                     print("New Head Node:", self.get_head_node())
                     time.sleep(2)
 
-                # Send messages
-                # message = f"Hello from {self.cluster_name}, Worker Head Node {self.get_head_node()}"
-                # self.send_inter_cluster_message(message)
-
-
+                # send Agregated message in inter-Cluster
                 if len(self.glb_msg)>=len(self.clients)-1:
                     self.aggratedglobalMsg()
                     time.sleep(6)
